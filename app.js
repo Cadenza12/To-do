@@ -7,16 +7,37 @@ const taskItemMarkup = `
       <path d="M20 6 9 17l-5-5"></path>
     </svg>
   </button>
-  <textarea class="task-input" rows="1"></textarea>
-  <button class="delete-button" type="button" aria-label="删除任务">
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M3 6h18"></path>
-      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-      <path d="M10 11v6"></path>
-      <path d="M14 11v6"></path>
-    </svg>
-  </button>
+  <div class="task-content">
+    <textarea class="task-input" rows="1"></textarea>
+    <label class="time-field">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v5l3 2"></path>
+      </svg>
+      <input class="time-input" type="text" autocomplete="off" placeholder="时间" aria-label="任务时间">
+    </label>
+  </div>
+  <div class="task-actions">
+    <button class="move-button move-up-button" type="button" aria-label="上移任务">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="m6 15 6-6 6 6"></path>
+      </svg>
+    </button>
+    <button class="move-button move-down-button" type="button" aria-label="下移任务">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
+    </button>
+    <button class="delete-button" type="button" aria-label="删除任务">
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+        <path d="M10 11v6"></path>
+        <path d="M14 11v6"></path>
+      </svg>
+    </button>
+  </div>
 `;
 
 const defaults = [
@@ -67,14 +88,24 @@ function loadTasks() {
   const raw = localStorage.getItem(STORAGE_KEY);
 
   if (!raw) {
-    return defaults.map((text) => ({ id: makeTaskId(), text }));
+    return defaults.map((text) => ({ id: makeTaskId(), text, time: "" }));
   }
 
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((task) => task?.id && typeof task.text === "string") : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((task) => task?.id && typeof task.text === "string")
+      .map((task) => ({
+        id: task.id,
+        text: task.text,
+        time: typeof task.time === "string" ? task.time : "",
+      }));
   } catch {
-    return defaults.map((text) => ({ id: makeTaskId(), text }));
+    return defaults.map((text) => ({ id: makeTaskId(), text, time: "" }));
   }
 }
 
@@ -108,6 +139,18 @@ function createTaskNode() {
   return node;
 }
 
+function moveTask(fromIndex, direction) {
+  const toIndex = fromIndex + direction;
+
+  if (toIndex < 0 || toIndex >= tasks.length) {
+    return;
+  }
+
+  [tasks[fromIndex], tasks[toIndex]] = [tasks[toIndex], tasks[fromIndex]];
+  saveTasks();
+  renderTasks();
+}
+
 function renderDate() {
   const now = new Date();
   weekdayLabel.textContent = new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(now);
@@ -120,17 +163,23 @@ function renderDate() {
 function renderTasks() {
   taskList.replaceChildren();
 
-  tasks.forEach((task) => {
+  tasks.forEach((task, index) => {
     const node = createTaskNode();
     const checkButton = node.querySelector(".check-button");
     const taskInput = node.querySelector(".task-input");
+    const timeInput = node.querySelector(".time-input");
+    const moveUpButton = node.querySelector(".move-up-button");
+    const moveDownButton = node.querySelector(".move-down-button");
     const deleteButton = node.querySelector(".delete-button");
 
     node.dataset.id = task.id;
     node.classList.toggle("done", Boolean(doneMap[task.id]));
     taskInput.value = task.text;
+    timeInput.value = task.time || "";
     fitTaskInput(taskInput);
     checkButton.setAttribute("aria-label", doneMap[task.id] ? "取消完成" : "标记完成");
+    moveUpButton.disabled = index === 0;
+    moveDownButton.disabled = index === tasks.length - 1;
 
     checkButton.addEventListener("click", () => {
       doneMap[task.id] = !doneMap[task.id];
@@ -155,6 +204,25 @@ function renderTasks() {
       fitTaskInput(taskInput);
       saveTasks();
       renderSummary();
+    });
+
+    timeInput.addEventListener("input", () => {
+      task.time = timeInput.value;
+      saveTasks();
+    });
+
+    timeInput.addEventListener("blur", () => {
+      task.time = timeInput.value.trim();
+      timeInput.value = task.time;
+      saveTasks();
+    });
+
+    moveUpButton.addEventListener("click", () => {
+      moveTask(index, -1);
+    });
+
+    moveDownButton.addEventListener("click", () => {
+      moveTask(index, 1);
     });
 
     deleteButton.addEventListener("click", () => {
@@ -198,7 +266,7 @@ function addTask(text) {
     return;
   }
 
-  tasks.push({ id: makeTaskId(), text: trimmed });
+  tasks.push({ id: makeTaskId(), text: trimmed, time: "" });
   saveTasks();
   renderTasks();
 }

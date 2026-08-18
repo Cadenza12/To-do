@@ -83,6 +83,7 @@ h2 {
 .add-button,
 .check-button,
 .delete-button,
+.move-button,
 .text-button {
   display: inline-flex;
   align-items: center;
@@ -104,6 +105,7 @@ h2 {
 .add-button svg,
 .check-button svg,
 .delete-button svg,
+.move-button svg,
 .text-button svg {
   width: 20px;
   height: 20px;
@@ -206,7 +208,7 @@ h2 {
   grid-template-columns: 44px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 8px;
-  min-height: 62px;
+  min-height: 96px;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -215,6 +217,12 @@ h2 {
 
 .task-item.done {
   background: rgba(223, 242, 235, 0.82);
+}
+
+.task-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
 }
 
 .check-button {
@@ -256,10 +264,81 @@ h2 {
   text-decoration: line-through;
 }
 
+.time-field {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f4f7fa;
+  color: #526675;
+}
+
+.time-field svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+}
+
+.time-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #34444f;
+  font-size: 15px;
+  outline: none;
+}
+
+.time-input::placeholder {
+  color: #8b98a3;
+}
+
+.time-field:focus-within {
+  border-color: var(--accent);
+  background: #ffffff;
+}
+
+.task-item.done .time-field {
+  background: rgba(255, 255, 255, 0.52);
+  color: #617369;
+}
+
+.task-item.done .time-input {
+  color: #617369;
+}
+
+.task-actions {
+  display: grid;
+  gap: 4px;
+  width: 42px;
+}
+
+.move-button,
 .delete-button {
   width: 42px;
-  height: 42px;
+  height: 32px;
   border-radius: 8px;
+}
+
+.move-button {
+  background: #edf2f6;
+  color: #526675;
+}
+
+.move-button:disabled {
+  cursor: default;
+  opacity: 0.32;
+}
+
+.delete-button {
   background: transparent;
   color: var(--berry);
 }
