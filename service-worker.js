@@ -1,9 +1,9 @@
-const CACHE_NAME = "daily-tasks-v5";
+const CACHE_NAME = "daily-tasks-v6";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
+  "./styles.css?v=6",
+  "./app.js?v=6",
   "./manifest.json",
   "./icon.svg",
 ];
