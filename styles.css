@@ -18,6 +18,7 @@
 
 html {
   min-height: 100%;
+  scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom));
   background: #f6f8fb;
 }
 
@@ -82,8 +83,10 @@ h2 {
 .icon-button,
 .add-button,
 .check-button,
-.delete-button,
-.move-button,
+.mark-button,
+.mark-heading,
+.drag-handle,
+.task-options-button,
 .text-button {
   display: inline-flex;
   align-items: center;
@@ -101,14 +104,12 @@ h2 {
   box-shadow: var(--shadow);
 }
 
-.icon-button svg,
-.add-button svg,
-.check-button svg,
-.delete-button svg,
-.move-button svg,
-.text-button svg {
+button svg,
+.drag-handle svg,
+.task-options-button svg {
   width: 20px;
   height: 20px;
+  flex: none;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -173,6 +174,8 @@ h2 {
 }
 
 .task-section {
+  --task-columns: 44px 66px minmax(0, 1fr) 44px;
+  --task-column-gap: 6px;
   margin-top: 8px;
 }
 
@@ -201,15 +204,49 @@ h2 {
   margin: 0;
   padding: 0;
   list-style: none;
+  overflow-anchor: none;
+}
+
+.task-columns,
+.task-item {
+  display: grid;
+  grid-template-columns: var(--task-columns);
+  align-items: center;
+  column-gap: var(--task-column-gap);
+  padding: 8px;
+}
+
+.task-columns {
+  padding: 0 9px 4px;
+  color: #40515f;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.mark-heading {
+  align-self: stretch;
+  gap: 3px;
+  min-height: 44px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: transparent;
+  color: #755018;
+}
+
+.mark-heading span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mark-heading svg {
+  width: 13px;
+  height: 13px;
 }
 
 .task-item {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 42px;
-  align-items: center;
-  gap: 8px;
+  position: relative;
   min-height: 96px;
-  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.94);
@@ -225,17 +262,40 @@ h2 {
   min-width: 0;
 }
 
-.check-button {
+.check-button,
+.mark-button {
+  justify-self: center;
   width: 44px;
   height: 44px;
   border-radius: 8px;
   background: #edf2f6;
-  color: transparent;
+  color: #476662;
 }
 
-.task-item.done .check-button {
+.check-button path {
+  opacity: 0;
+}
+
+.check-button[aria-pressed="true"] {
   background: var(--accent);
   color: #ffffff;
+}
+
+.check-button[aria-pressed="true"] path {
+  opacity: 1;
+}
+
+.mark-button {
+  background: #fff6e5;
+  color: #815519;
+}
+
+.mark-button[aria-pressed="true"] {
+  background: #f5da9c;
+}
+
+.mark-button[aria-pressed="true"] path {
+  fill: currentColor;
 }
 
 .task-input {
@@ -266,11 +326,11 @@ h2 {
 
 .time-field {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   min-height: 34px;
-  padding: 0 10px;
+  padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f4f7fa;
@@ -278,8 +338,8 @@ h2 {
 }
 
 .time-field svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -293,7 +353,7 @@ h2 {
   border: 0;
   background: transparent;
   color: #34444f;
-  font-size: 15px;
+  font-size: 16px;
   outline: none;
 }
 
@@ -317,30 +377,151 @@ h2 {
 
 .task-actions {
   display: grid;
-  gap: 4px;
-  width: 42px;
+  justify-items: center;
 }
 
-.move-button,
-.delete-button {
-  width: 42px;
-  height: 32px;
+.drag-handle,
+.task-options-button {
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
-}
-
-.move-button {
-  background: #edf2f6;
   color: #526675;
 }
 
-.move-button:disabled {
-  cursor: default;
-  opacity: 0.32;
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.delete-button {
+.drag-handle svg,
+.task-options-button svg {
+  fill: currentColor;
+}
+
+.task-item.dragging {
+  z-index: 1;
+  transform: translateY(var(--drag-offset, 0px));
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(31, 47, 62, 0.19);
+}
+
+.dragging .drag-handle {
+  cursor: grabbing;
+}
+
+.task-options-button {
+  list-style: none;
+}
+
+.task-options-button::-webkit-details-marker {
+  display: none;
+}
+
+.task-item:has(.task-options[open]) {
+  z-index: 2;
+}
+
+.task-options {
+  position: relative;
+}
+
+.task-menu {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  display: grid;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.task-options:not([open]) .task-menu {
+  display: none;
+}
+
+.task-options.menu-below .task-menu {
+  top: 100%;
+  bottom: auto;
+}
+
+.task-menu button {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: var(--berry);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-menu button:disabled {
+  color: #89949e;
+  cursor: default;
+}
+
+.task-menu .delete-button {
+  color: #a43350;
+}
+
+@media (hover: hover) {
+  .mark-heading:hover,
+  .drag-handle:hover,
+  .task-options-button:hover,
+  .task-menu button:not(:disabled):hover {
+    background: #edf2f6;
+  }
+}
+
+.rename-dialog {
+  width: min(100% - 36px, 330px);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: inherit;
+  box-shadow: var(--shadow);
+}
+
+.rename-dialog::backdrop {
+  background: rgba(31, 47, 62, 0.42);
+}
+
+.rename-dialog input {
+  width: 100%;
+  min-height: 44px;
+  margin: 14px 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-actions button {
+  min-width: 64px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: #edf2f6;
+  color: #40515f;
+  cursor: pointer;
+}
+
+.dialog-actions .save-title-button {
+  background: var(--accent);
+  color: white;
 }
 
 .empty-state {
@@ -359,6 +540,7 @@ h2 {
 
 .composer {
   position: fixed;
+  z-index: 3;
   right: max(18px, calc((100vw - 520px) / 2 + 18px));
   bottom: calc(14px + env(safe-area-inset-bottom));
   left: max(18px, calc((100vw - 520px) / 2 + 18px));
@@ -413,6 +595,11 @@ h2 {
   .app-shell {
     padding-right: 14px;
     padding-left: 14px;
+  }
+
+  .task-section {
+    --task-columns: 44px 56px minmax(0, 1fr) 44px;
+    --task-column-gap: 4px;
   }
 
   .status-panel {

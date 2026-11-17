@@ -1,14 +1,23 @@
 const STORAGE_KEY = "dailyTasks.v1";
 const TODAY_KEY = "dailyTasks.currentDay";
 const DONE_KEY = "dailyTasks.doneMap";
+const MARKED_KEY = "dailyTasks.markedMap";
+const MARK_TITLE_KEY = "dailyTasks.markTitle";
+const DEFAULT_MARK_TITLE = "标记";
 const taskItemMarkup = `
-  <button class="check-button" type="button" aria-label="标记完成">
+  <button class="check-button" type="button" aria-label="完成" title="完成" aria-pressed="false">
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M20 6 9 17l-5-5"></path>
+      <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+      <path d="m8 12 3 3 5-6"></path>
+    </svg>
+  </button>
+  <button class="mark-button" type="button" aria-pressed="false">
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M11.5 2.8a.6.6 0 0 1 1 0l2.6 5.3 5.9.9a.6.6 0 0 1 .3 1l-4.3 4.2 1 5.9a.6.6 0 0 1-.8.6L12 18l-5.2 2.7a.6.6 0 0 1-.8-.6l1-5.9L2.7 10a.6.6 0 0 1 .3-1l5.9-.9z"></path>
     </svg>
   </button>
   <div class="task-content">
-    <textarea class="task-input" rows="1"></textarea>
+    <textarea class="task-input" rows="1" aria-label="任务内容"></textarea>
     <label class="time-field">
       <svg aria-hidden="true" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9"></circle>
@@ -18,25 +27,30 @@ const taskItemMarkup = `
     </label>
   </div>
   <div class="task-actions">
-    <button class="move-button move-up-button" type="button" aria-label="上移任务">
+    <span class="drag-handle" aria-hidden="true" title="拖动排序">
       <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="m6 15 6-6 6 6"></path>
+        <circle cx="9" cy="5" r="1"></circle>
+        <circle cx="9" cy="12" r="1"></circle>
+        <circle cx="9" cy="19" r="1"></circle>
+        <circle cx="15" cy="5" r="1"></circle>
+        <circle cx="15" cy="12" r="1"></circle>
+        <circle cx="15" cy="19" r="1"></circle>
       </svg>
-    </button>
-    <button class="move-button move-down-button" type="button" aria-label="下移任务">
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="m6 9 6 6 6-6"></path>
-      </svg>
-    </button>
-    <button class="delete-button" type="button" aria-label="删除任务">
-      <svg aria-hidden="true" viewBox="0 0 24 24">
-        <path d="M3 6h18"></path>
-        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-        <path d="M10 11v6"></path>
-        <path d="M14 11v6"></path>
-      </svg>
-    </button>
+    </span>
+    <details class="task-options">
+      <summary class="task-options-button" aria-label="任务操作" title="任务操作">
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <circle cx="5" cy="12" r="1"></circle>
+          <circle cx="12" cy="12" r="1"></circle>
+          <circle cx="19" cy="12" r="1"></circle>
+        </svg>
+      </summary>
+      <div class="task-menu">
+        <button class="move-up-button" type="button">上移任务</button>
+        <button class="move-down-button" type="button">下移任务</button>
+        <button class="delete-button" type="button">删除任务</button>
+      </div>
+    </details>
   </div>
 `;
 
@@ -52,6 +66,13 @@ const addTaskForm = document.querySelector("#addTaskForm");
 const newTaskInput = document.querySelector("#newTaskInput");
 const refreshDayButton = document.querySelector("#refreshDayButton");
 const clearDoneButton = document.querySelector("#clearDoneButton");
+const editMarkTitleButton = document.querySelector("#editMarkTitleButton");
+const markTitleLabel = document.querySelector("#markTitleLabel");
+const markTitleDialog = document.querySelector("#markTitleDialog");
+const markTitleForm = document.querySelector("#markTitleForm");
+const markTitleInput = document.querySelector("#markTitleInput");
+const cancelMarkTitleButton = document.querySelector("#cancelMarkTitleButton");
+const sortStatus = document.querySelector("#sortStatus");
 const weekdayLabel = document.querySelector("#weekdayLabel");
 const dateLabel = document.querySelector("#dateLabel");
 const progressLabel = document.querySelector("#progressLabel");
@@ -59,7 +80,10 @@ const percentLabel = document.querySelector("#percentLabel");
 const progressRing = document.querySelector(".progress-ring");
 
 let tasks = loadTasks();
-let doneMap = loadDoneMap();
+let doneMap = loadToggleMap(DONE_KEY);
+let markedMap = loadToggleMap(MARKED_KEY);
+let markTitle = localStorage.getItem(MARK_TITLE_KEY) || DEFAULT_MARK_TITLE;
+let drag = null;
 
 function makeTaskId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
@@ -78,9 +102,7 @@ function ensureTodayList() {
   const currentDay = todayId();
 
   if (storedDay !== currentDay) {
-    localStorage.setItem(TODAY_KEY, currentDay);
-    doneMap = {};
-    saveDoneMap();
+    resetDayChecks(currentDay);
   }
 }
 
@@ -109,11 +131,10 @@ function loadTasks() {
   }
 }
 
-function loadDoneMap() {
-  const raw = localStorage.getItem(DONE_KEY);
-
+function loadToggleMap(key) {
   try {
-    return raw ? JSON.parse(raw) : {};
+    const stored = JSON.parse(localStorage.getItem(key));
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
   } catch {
     return {};
   }
@@ -123,13 +144,26 @@ function saveTasks() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
 }
 
-function saveDoneMap() {
-  localStorage.setItem(DONE_KEY, JSON.stringify(doneMap));
+function toggleCheck(map, key, id) {
+  if (map[id]) {
+    delete map[id];
+  } else {
+    map[id] = true;
+  }
+  localStorage.setItem(key, JSON.stringify(map));
+}
+
+function resetDayChecks(day) {
+  doneMap = {};
+  markedMap = {};
+  localStorage.removeItem(DONE_KEY);
+  localStorage.removeItem(MARKED_KEY);
+  localStorage.setItem(TODAY_KEY, day);
 }
 
 function fitTaskInput(input) {
   input.style.height = "auto";
-  input.style.height = `${input.scrollHeight}px`;
+  input.style.height = `${input.scrollHeight + 1}px`;
 }
 
 function createTaskNode() {
@@ -139,16 +173,129 @@ function createTaskNode() {
   return node;
 }
 
-function moveTask(fromIndex, direction) {
-  const toIndex = fromIndex + direction;
+function syncMoveButtons() {
+  [...taskList.children].forEach((row, index) => {
+    row.querySelector(".move-up-button").disabled = index === 0;
+    row.querySelector(".move-down-button").disabled = index === tasks.length - 1;
+  });
+}
 
-  if (toIndex < 0 || toIndex >= tasks.length) {
+function saveTaskMove(fromIndex, toIndex) {
+  if (fromIndex === toIndex) {
     return;
   }
 
-  [tasks[fromIndex], tasks[toIndex]] = [tasks[toIndex], tasks[fromIndex]];
+  const [task] = tasks.splice(fromIndex, 1);
+  tasks.splice(toIndex, 0, task);
   saveTasks();
-  renderTasks();
+  syncMoveButtons();
+  sortStatus.textContent = `任务已移到第 ${toIndex + 1} 项`;
+}
+
+function moveTask(row, direction) {
+  endDrag(false);
+  const index = Array.from(taskList.children).indexOf(row);
+  const neighbor = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!neighbor) {
+    return;
+  }
+
+  row.querySelector(".task-options").open = false;
+  taskList.insertBefore(row, direction < 0 ? neighbor : neighbor.nextElementSibling);
+  saveTaskMove(index, index + direction);
+  row.querySelector(".task-options-button").focus();
+}
+
+function beginDrag(event) {
+  const handle = event.target.closest(".drag-handle");
+  if (!handle || drag || !event.isPrimary || event.button !== 0 || tasks.length < 2) {
+    return;
+  }
+
+  const row = handle.closest(".task-item");
+  drag = {
+    pointerId: event.pointerId,
+    row,
+    fromIndex: Array.from(taskList.children).indexOf(row),
+    startY: event.clientY,
+    y: event.clientY,
+    grabOffset: event.clientY - row.getBoundingClientRect().top,
+    translation: 0,
+    frame: null,
+  };
+  taskList.setPointerCapture(event.pointerId);
+}
+
+function followDrag(event) {
+  if (drag?.pointerId !== event.pointerId) {
+    return;
+  }
+
+  drag.y = event.clientY;
+  if (drag.frame === null && Math.abs(drag.y - drag.startY) >= 6) {
+    drag.row.classList.add("dragging");
+    drag.frame = requestAnimationFrame(animateDrag);
+  }
+}
+
+function positionDraggedTask(state) {
+  const { row, y, grabOffset } = state;
+  const top = y - grabOffset;
+  const middle = top + row.offsetHeight / 2;
+  const next = Array.from(taskList.children).find((candidate) => {
+    if (candidate === row) {
+      return false;
+    }
+    const rect = candidate.getBoundingClientRect();
+    return middle < rect.top + rect.height / 2;
+  }) ?? null;
+
+  if (next !== row.nextElementSibling) {
+    taskList.insertBefore(row, next);
+  }
+
+  // The row keeps its grid slot while its painted position follows the pointer.
+  state.translation += top - row.getBoundingClientRect().top;
+  row.style.setProperty("--drag-offset", `${state.translation}px`);
+}
+
+function animateDrag() {
+  const edge = 64;
+  const bottom = Math.min(window.innerHeight, addTaskForm.getBoundingClientRect().top);
+  const up = Math.max(0, edge - drag.y);
+  const down = Math.max(0, drag.y - (bottom - edge));
+  const scroll = Math.max(-18, Math.min(18, (down - up) / 4));
+  if (scroll) {
+    window.scrollBy(0, scroll);
+  }
+
+  positionDraggedTask(drag);
+  drag.frame = requestAnimationFrame(animateDrag);
+}
+
+function endDrag(commit) {
+  if (!drag) {
+    return;
+  }
+  const state = drag;
+  drag = null;
+
+  if (state.frame !== null) {
+    cancelAnimationFrame(state.frame);
+    if (commit) {
+      positionDraggedTask(state);
+      saveTaskMove(state.fromIndex, Array.from(taskList.children).indexOf(state.row));
+    } else {
+      const remaining = Array.from(taskList.children).filter((row) => row !== state.row);
+      taskList.insertBefore(state.row, remaining[state.fromIndex] ?? null);
+    }
+    state.row.classList.remove("dragging");
+    state.row.style.removeProperty("--drag-offset");
+  }
+
+  if (taskList.hasPointerCapture(state.pointerId)) {
+    taskList.releasePointerCapture(state.pointerId);
+  }
 }
 
 function renderDate() {
@@ -161,35 +308,47 @@ function renderDate() {
 }
 
 function renderTasks() {
+  endDrag(false);
   taskList.replaceChildren();
 
-  tasks.forEach((task, index) => {
+  tasks.forEach((task) => {
     const node = createTaskNode();
     const checkButton = node.querySelector(".check-button");
+    const markButton = node.querySelector(".mark-button");
     const taskInput = node.querySelector(".task-input");
     const timeInput = node.querySelector(".time-input");
     const moveUpButton = node.querySelector(".move-up-button");
     const moveDownButton = node.querySelector(".move-down-button");
     const deleteButton = node.querySelector(".delete-button");
+    const options = node.querySelector(".task-options");
+    const menu = node.querySelector(".task-menu");
 
     node.dataset.id = task.id;
     node.classList.toggle("done", Boolean(doneMap[task.id]));
     taskInput.value = task.text;
     timeInput.value = task.time || "";
-    fitTaskInput(taskInput);
-    checkButton.setAttribute("aria-label", doneMap[task.id] ? "取消完成" : "标记完成");
-    moveUpButton.disabled = index === 0;
-    moveDownButton.disabled = index === tasks.length - 1;
+    checkButton.setAttribute("aria-pressed", Boolean(doneMap[task.id]));
+    markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
+    markButton.setAttribute("aria-label", markTitle);
+    markButton.title = markTitle;
 
     checkButton.addEventListener("click", () => {
-      doneMap[task.id] = !doneMap[task.id];
+      toggleCheck(doneMap, DONE_KEY, task.id);
+      const isDone = Boolean(doneMap[task.id]);
+      node.classList.toggle("done", isDone);
+      checkButton.setAttribute("aria-pressed", isDone);
+      renderSummary();
+    });
 
-      if (!doneMap[task.id]) {
-        delete doneMap[task.id];
+    markButton.addEventListener("click", () => {
+      toggleCheck(markedMap, MARKED_KEY, task.id);
+      markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
+    });
+
+    options.addEventListener("toggle", () => {
+      if (options.open) {
+        options.classList.toggle("menu-below", options.getBoundingClientRect().top < menu.offsetHeight);
       }
-
-      saveDoneMap();
-      renderTasks();
     });
 
     taskInput.addEventListener("input", () => {
@@ -218,24 +377,28 @@ function renderTasks() {
     });
 
     moveUpButton.addEventListener("click", () => {
-      moveTask(index, -1);
+      moveTask(node, -1);
     });
 
     moveDownButton.addEventListener("click", () => {
-      moveTask(index, 1);
+      moveTask(node, 1);
     });
 
     deleteButton.addEventListener("click", () => {
       tasks = tasks.filter((item) => item.id !== task.id);
       delete doneMap[task.id];
+      delete markedMap[task.id];
       saveTasks();
-      saveDoneMap();
+      localStorage.setItem(DONE_KEY, JSON.stringify(doneMap));
+      localStorage.setItem(MARKED_KEY, JSON.stringify(markedMap));
       renderTasks();
     });
 
     taskList.append(node);
+    fitTaskInput(taskInput);
   });
 
+  syncMoveButtons();
   emptyState.classList.toggle("visible", tasks.length === 0);
   renderSummary();
 }
@@ -278,22 +441,80 @@ addTaskForm.addEventListener("submit", (event) => {
   newTaskInput.focus();
 });
 
-refreshDayButton.addEventListener("click", () => {
-  localStorage.setItem(TODAY_KEY, todayId());
-  doneMap = {};
-  saveDoneMap();
+function refreshDay() {
+  resetDayChecks(todayId());
+  renderDate();
   renderTasks();
+}
+
+function updateMarkTitle() {
+  markTitleLabel.textContent = markTitle;
+  editMarkTitleButton.setAttribute("aria-label", `${markTitle}，编辑列名`);
+  for (const button of taskList.querySelectorAll(".mark-button")) {
+    button.setAttribute("aria-label", markTitle);
+    button.title = markTitle;
+  }
+}
+
+editMarkTitleButton.addEventListener("click", () => {
+  markTitleInput.value = markTitle;
+  markTitleDialog.showModal();
+  markTitleInput.focus();
+  markTitleInput.select();
 });
 
-clearDoneButton.addEventListener("click", () => {
-  doneMap = {};
-  saveDoneMap();
-  renderTasks();
+markTitleForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  markTitle = markTitleInput.value.trim() || DEFAULT_MARK_TITLE;
+  localStorage.setItem(MARK_TITLE_KEY, markTitle);
+  updateMarkTitle();
+  markTitleDialog.close();
 });
 
+cancelMarkTitleButton.addEventListener("click", () => markTitleDialog.close());
+refreshDayButton.addEventListener("click", refreshDay);
+clearDoneButton.addEventListener("click", refreshDay);
+
+taskList.addEventListener("pointerdown", beginDrag);
+taskList.addEventListener("pointermove", followDrag);
+taskList.addEventListener("pointerup", (event) => {
+  if (drag?.pointerId === event.pointerId) {
+    drag.y = event.clientY;
+    endDrag(true);
+  }
+});
+taskList.addEventListener("pointercancel", (event) => {
+  if (drag?.pointerId === event.pointerId) endDrag(false);
+});
+taskList.addEventListener("lostpointercapture", (event) => {
+  if (drag?.pointerId === event.pointerId) endDrag(false);
+});
+
+document.addEventListener("pointerdown", (event) => {
+  for (const options of taskList.querySelectorAll(".task-options[open]")) {
+    if (!options.contains(event.target)) options.open = false;
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (drag) endDrag(false);
+  const options = event.target.closest?.(".task-options[open]");
+  if (options) {
+    options.open = false;
+    options.querySelector(".task-options-button").focus();
+  }
+});
+window.addEventListener("resize", () => {
+  taskList.querySelectorAll(".task-input").forEach(fitTaskInput);
+});
+
+if (localStorage.getItem(STORAGE_KEY) === null) {
+  saveTasks();
+}
 ensureTodayList();
 renderDate();
 renderTasks();
+updateMarkTitle();
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js").catch(() => {});

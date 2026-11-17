@@ -6,10 +6,12 @@
     <meta name="theme-color" content="#f7f4ef" />
     <title>每日任务</title>
     <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <link rel="stylesheet" href="styles.css?v=7" />
   </head>
   <body>
-    <main class="app-shell" aria-live="polite">
+    <main class="app-shell">
       <header class="top-bar">
         <div>
           <p class="eyebrow" id="weekdayLabel">今天</p>
@@ -31,14 +33,14 @@
         </div>
         <div class="status-copy">
           <p id="dateLabel"></p>
-          <strong id="progressLabel">还没有完成任务</strong>
+          <strong id="progressLabel" aria-live="polite">还没有完成任务</strong>
         </div>
       </section>
 
       <section class="task-section" aria-label="任务列表">
         <div class="section-head">
           <h2>清单</h2>
-          <button class="text-button" id="clearDoneButton" type="button">
+          <button class="text-button" id="clearDoneButton" type="button" aria-label="清空勾选">
             <svg aria-hidden="true" viewBox="0 0 24 24">
               <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
               <path d="M3 3v5h5" />
@@ -46,13 +48,23 @@
             <span>清空勾选</span>
           </button>
         </div>
+        <div class="task-columns">
+          <span class="done-heading">完成</span>
+          <button class="mark-heading" id="editMarkTitleButton" type="button" aria-label="编辑列名" title="编辑列名">
+            <span id="markTitleLabel">标记</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L9 17l-4 1 1-4Z" />
+            </svg>
+          </button>
+        </div>
         <ul class="task-list" id="taskList"></ul>
+        <p class="sr-only" id="sortStatus" role="status"></p>
         <p class="empty-state" id="emptyState">还没有任务，先添加一件小事。</p>
       </section>
 
       <form class="composer" id="addTaskForm">
         <label class="sr-only" for="newTaskInput">新任务</label>
-        <input id="newTaskInput" name="task" type="text" autocomplete="off" placeholder="添加今天要做的事" />
+        <input id="newTaskInput" type="text" autocomplete="off" placeholder="添加今天要做的事" />
         <button class="add-button" type="submit" aria-label="添加任务">
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M5 12h14" />
@@ -62,6 +74,18 @@
       </form>
     </main>
 
-    <script src="app.js?v=6"></script>
+    <dialog class="rename-dialog" id="markTitleDialog" aria-labelledby="renameTitle">
+      <form id="markTitleForm" method="dialog">
+        <h2 id="renameTitle">编辑列名</h2>
+        <label class="sr-only" for="markTitleInput">列名</label>
+        <input id="markTitleInput" type="text" maxlength="24" autocomplete="off" placeholder="标记" autofocus />
+        <div class="dialog-actions">
+          <button id="cancelMarkTitleButton" type="button">取消</button>
+          <button class="save-title-button" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js?v=7"></script>
   </body>
 </html>
