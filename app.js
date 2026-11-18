@@ -37,20 +37,9 @@ const taskItemMarkup = `
         <circle cx="15" cy="19" r="1"></circle>
       </svg>
     </span>
-    <details class="task-options">
-      <summary class="task-options-button" aria-label="任务操作" title="任务操作">
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <circle cx="5" cy="12" r="1"></circle>
-          <circle cx="12" cy="12" r="1"></circle>
-          <circle cx="19" cy="12" r="1"></circle>
-        </svg>
-      </summary>
-      <div class="task-menu">
-        <button class="move-up-button" type="button">上移任务</button>
-        <button class="move-down-button" type="button">下移任务</button>
-        <button class="delete-button" type="button">删除任务</button>
-      </div>
-    </details>
+    <button class="delete-button" type="button" aria-label="删除任务" title="删除任务">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6m4-6v6" /></svg>
+    </button>
   </div>
 `;
 
@@ -173,13 +162,6 @@ function createTaskNode() {
   return node;
 }
 
-function syncMoveButtons() {
-  [...taskList.children].forEach((row, index) => {
-    row.querySelector(".move-up-button").disabled = index === 0;
-    row.querySelector(".move-down-button").disabled = index === tasks.length - 1;
-  });
-}
-
 function saveTaskMove(fromIndex, toIndex) {
   if (fromIndex === toIndex) {
     return;
@@ -188,22 +170,7 @@ function saveTaskMove(fromIndex, toIndex) {
   const [task] = tasks.splice(fromIndex, 1);
   tasks.splice(toIndex, 0, task);
   saveTasks();
-  syncMoveButtons();
   sortStatus.textContent = `任务已移到第 ${toIndex + 1} 项`;
-}
-
-function moveTask(row, direction) {
-  endDrag(false);
-  const index = Array.from(taskList.children).indexOf(row);
-  const neighbor = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
-  if (!neighbor) {
-    return;
-  }
-
-  row.querySelector(".task-options").open = false;
-  taskList.insertBefore(row, direction < 0 ? neighbor : neighbor.nextElementSibling);
-  saveTaskMove(index, index + direction);
-  row.querySelector(".task-options-button").focus();
 }
 
 function beginDrag(event) {
@@ -317,11 +284,7 @@ function renderTasks() {
     const markButton = node.querySelector(".mark-button");
     const taskInput = node.querySelector(".task-input");
     const timeInput = node.querySelector(".time-input");
-    const moveUpButton = node.querySelector(".move-up-button");
-    const moveDownButton = node.querySelector(".move-down-button");
     const deleteButton = node.querySelector(".delete-button");
-    const options = node.querySelector(".task-options");
-    const menu = node.querySelector(".task-menu");
 
     node.dataset.id = task.id;
     node.classList.toggle("done", Boolean(doneMap[task.id]));
@@ -343,12 +306,6 @@ function renderTasks() {
     markButton.addEventListener("click", () => {
       toggleCheck(markedMap, MARKED_KEY, task.id);
       markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
-    });
-
-    options.addEventListener("toggle", () => {
-      if (options.open) {
-        options.classList.toggle("menu-below", options.getBoundingClientRect().top < menu.offsetHeight);
-      }
     });
 
     taskInput.addEventListener("input", () => {
@@ -376,14 +333,6 @@ function renderTasks() {
       saveTasks();
     });
 
-    moveUpButton.addEventListener("click", () => {
-      moveTask(node, -1);
-    });
-
-    moveDownButton.addEventListener("click", () => {
-      moveTask(node, 1);
-    });
-
     deleteButton.addEventListener("click", () => {
       tasks = tasks.filter((item) => item.id !== task.id);
       delete doneMap[task.id];
@@ -398,7 +347,6 @@ function renderTasks() {
     fitTaskInput(taskInput);
   });
 
-  syncMoveButtons();
   emptyState.classList.toggle("visible", tasks.length === 0);
   renderSummary();
 }
@@ -490,19 +438,10 @@ taskList.addEventListener("lostpointercapture", (event) => {
   if (drag?.pointerId === event.pointerId) endDrag(false);
 });
 
-document.addEventListener("pointerdown", (event) => {
-  for (const options of taskList.querySelectorAll(".task-options[open]")) {
-    if (!options.contains(event.target)) options.open = false;
-  }
-});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (drag) endDrag(false);
-  const options = event.target.closest?.(".task-options[open]");
-  if (options) {
-    options.open = false;
-    options.querySelector(".task-options-button").focus();
-  }
+
 });
 window.addEventListener("resize", () => {
   taskList.querySelectorAll(".task-input").forEach(fitTaskInput);

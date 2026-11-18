@@ -86,7 +86,7 @@ h2 {
 .mark-button,
 .mark-heading,
 .drag-handle,
-.task-options-button,
+.delete-button,
 .text-button {
   display: inline-flex;
   align-items: center;
@@ -106,7 +106,7 @@ h2 {
 
 button svg,
 .drag-handle svg,
-.task-options-button svg {
+.delete-button svg {
   width: 20px;
   height: 20px;
   flex: none;
@@ -381,7 +381,7 @@ button svg,
 }
 
 .drag-handle,
-.task-options-button {
+.delete-button {
   width: 44px;
   height: 44px;
   border-radius: 8px;
@@ -396,8 +396,7 @@ button svg,
   -webkit-touch-callout: none;
 }
 
-.drag-handle svg,
-.task-options-button svg {
+.drag-handle svg {
   fill: currentColor;
 }
 
@@ -412,69 +411,14 @@ button svg,
   cursor: grabbing;
 }
 
-.task-options-button {
-  list-style: none;
-}
-
-.task-options-button::-webkit-details-marker {
-  display: none;
-}
-
-.task-item:has(.task-options[open]) {
-  z-index: 2;
-}
-
-.task-options {
-  position: relative;
-}
-
-.task-menu {
-  position: absolute;
-  right: 0;
-  bottom: 100%;
-  display: grid;
-  min-width: 120px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--paper);
-  box-shadow: var(--shadow);
-}
-
-.task-options:not([open]) .task-menu {
-  display: none;
-}
-
-.task-options.menu-below .task-menu {
-  top: 100%;
-  bottom: auto;
-}
-
-.task-menu button {
-  min-height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.task-menu button:disabled {
-  color: #89949e;
-  cursor: default;
-}
-
-.task-menu .delete-button {
+.delete-button {
   color: #a43350;
 }
 
 @media (hover: hover) {
   .mark-heading:hover,
   .drag-handle:hover,
-  .task-options-button:hover,
-  .task-menu button:not(:disabled):hover {
+  .delete-button:hover {
     background: #edf2f6;
   }
 }
