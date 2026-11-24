@@ -52,9 +52,11 @@ const defaults = [
 const taskList = document.querySelector("#taskList");
 const emptyState = document.querySelector("#emptyState");
 const addTaskForm = document.querySelector("#addTaskForm");
+const addButton = addTaskForm.querySelector(".add-button");
 const newTaskInput = document.querySelector("#newTaskInput");
 const refreshDayButton = document.querySelector("#refreshDayButton");
 const clearDoneButton = document.querySelector("#clearDoneButton");
+const exportTasksButton = document.querySelector("#exportTasksButton");
 const editMarkTitleButton = document.querySelector("#editMarkTitleButton");
 const markTitleLabel = document.querySelector("#markTitleLabel");
 const markTitleDialog = document.querySelector("#markTitleDialog");
@@ -277,78 +279,77 @@ function renderDate() {
 function renderTasks() {
   endDrag(false);
   taskList.replaceChildren();
+  tasks.forEach(appendTaskRow);
+  renderSummary();
+}
 
-  tasks.forEach((task) => {
-    const node = createTaskNode();
-    const checkButton = node.querySelector(".check-button");
-    const markButton = node.querySelector(".mark-button");
-    const taskInput = node.querySelector(".task-input");
-    const timeInput = node.querySelector(".time-input");
-    const deleteButton = node.querySelector(".delete-button");
+function appendTaskRow(task) {
+  const node = createTaskNode();
+  const checkButton = node.querySelector(".check-button");
+  const markButton = node.querySelector(".mark-button");
+  const taskInput = node.querySelector(".task-input");
+  const timeInput = node.querySelector(".time-input");
+  const deleteButton = node.querySelector(".delete-button");
 
-    node.dataset.id = task.id;
-    node.classList.toggle("done", Boolean(doneMap[task.id]));
-    taskInput.value = task.text;
-    timeInput.value = task.time || "";
-    checkButton.setAttribute("aria-pressed", Boolean(doneMap[task.id]));
-    markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
-    markButton.setAttribute("aria-label", markTitle);
-    markButton.title = markTitle;
+  node.dataset.id = task.id;
+  node.classList.toggle("done", Boolean(doneMap[task.id]));
+  taskInput.value = task.text;
+  timeInput.value = task.time || "";
+  checkButton.setAttribute("aria-pressed", Boolean(doneMap[task.id]));
+  markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
+  markButton.setAttribute("aria-label", markTitle);
+  markButton.title = markTitle;
 
-    checkButton.addEventListener("click", () => {
-      toggleCheck(doneMap, DONE_KEY, task.id);
-      const isDone = Boolean(doneMap[task.id]);
-      node.classList.toggle("done", isDone);
-      checkButton.setAttribute("aria-pressed", isDone);
-      renderSummary();
-    });
-
-    markButton.addEventListener("click", () => {
-      toggleCheck(markedMap, MARKED_KEY, task.id);
-      markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
-    });
-
-    taskInput.addEventListener("input", () => {
-      task.text = taskInput.value;
-      fitTaskInput(taskInput);
-      saveTasks();
-    });
-
-    taskInput.addEventListener("blur", () => {
-      task.text = taskInput.value.trim();
-      taskInput.value = task.text;
-      fitTaskInput(taskInput);
-      saveTasks();
-      renderSummary();
-    });
-
-    timeInput.addEventListener("input", () => {
-      task.time = timeInput.value;
-      saveTasks();
-    });
-
-    timeInput.addEventListener("blur", () => {
-      task.time = timeInput.value.trim();
-      timeInput.value = task.time;
-      saveTasks();
-    });
-
-    deleteButton.addEventListener("click", () => {
-      tasks = tasks.filter((item) => item.id !== task.id);
-      delete doneMap[task.id];
-      delete markedMap[task.id];
-      saveTasks();
-      localStorage.setItem(DONE_KEY, JSON.stringify(doneMap));
-      localStorage.setItem(MARKED_KEY, JSON.stringify(markedMap));
-      renderTasks();
-    });
-
-    taskList.append(node);
-    fitTaskInput(taskInput);
+  checkButton.addEventListener("click", () => {
+    toggleCheck(doneMap, DONE_KEY, task.id);
+    const isDone = Boolean(doneMap[task.id]);
+    node.classList.toggle("done", isDone);
+    checkButton.setAttribute("aria-pressed", isDone);
+    renderSummary();
   });
 
-  emptyState.classList.toggle("visible", tasks.length === 0);
-  renderSummary();
+  markButton.addEventListener("click", () => {
+    toggleCheck(markedMap, MARKED_KEY, task.id);
+    markButton.setAttribute("aria-pressed", Boolean(markedMap[task.id]));
+  });
+
+  taskInput.addEventListener("input", () => {
+    task.text = taskInput.value;
+    fitTaskInput(taskInput);
+    saveTasks();
+  });
+
+  taskInput.addEventListener("blur", () => {
+    task.text = taskInput.value.trim();
+    taskInput.value = task.text;
+    fitTaskInput(taskInput);
+    saveTasks();
+    renderSummary();
+  });
+
+  timeInput.addEventListener("input", () => {
+    task.time = timeInput.value;
+    saveTasks();
+  });
+
+  timeInput.addEventListener("blur", () => {
+    task.time = timeInput.value.trim();
+    timeInput.value = task.time;
+    saveTasks();
+  });
+
+  deleteButton.addEventListener("click", () => {
+    tasks = tasks.filter((item) => item.id !== task.id);
+    delete doneMap[task.id];
+    delete markedMap[task.id];
+    saveTasks();
+    localStorage.setItem(DONE_KEY, JSON.stringify(doneMap));
+    localStorage.setItem(MARKED_KEY, JSON.stringify(markedMap));
+    renderTasks();
+  });
+
+  taskList.append(node);
+  fitTaskInput(taskInput);
 }
 
 function renderSummary() {
@@ -356,6 +357,8 @@ function renderSummary() {
   const done = tasks.filter((task) => doneMap[task.id]).length;
   const percent = total === 0 ? 0 : Math.round((done / total) * 100);
 
+  emptyState.classList.toggle("visible", total === 0);
+  if (exportTasksButton) exportTasksButton.disabled = total === 0;
   percentLabel.textContent = `${percent}%`;
   progressRing.style.setProperty("--progress", `${percent * 3.6}deg`);
 
@@ -377,22 +380,82 @@ function addTask(text) {
     return;
   }
 
-  tasks.push({ id: makeTaskId(), text: trimmed, time: "" });
+  endDrag(false);
+  const task = { id: makeTaskId(), text: trimmed, time: "" };
+  tasks.push(task);
   saveTasks();
-  renderTasks();
+  appendTaskRow(task);
+  renderSummary();
 }
+
+// The iPhone keyboard can shrink and pan the visible area without resizing the page.
+const viewport = window.visualViewport;
+if (viewport) {
+  const syncComposerEdge = () => {
+    const edge = Math.abs(viewport.scale - 1) < 0.01
+      ? `${viewport.offsetTop + viewport.height}px` : "100%";
+    addTaskForm.style.setProperty("--visible-bottom", edge);
+  };
+  viewport.addEventListener("resize", syncComposerEdge);
+  viewport.addEventListener("scroll", syncComposerEdge);
+  addTaskForm.addEventListener("focusin", syncComposerEdge);
+  syncComposerEdge();
+}
+
+// Cancel only the mouse focus change; cancelling touch pointerdown can swallow Safari's click.
+addButton.addEventListener("mousedown", (event) => {
+  if (event.button === 0 && document.activeElement === newTaskInput) {
+    event.preventDefault();
+  }
+});
+
+newTaskInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.isComposing && event.keyCode !== 229) {
+    event.preventDefault();
+    addButton.click();
+  }
+});
 
 addTaskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   addTask(newTaskInput.value);
   newTaskInput.value = "";
-  newTaskInput.focus();
+  if (document.activeElement !== newTaskInput) {
+    newTaskInput.focus({ preventScroll: true });
+  }
 });
 
 function refreshDay() {
   resetDayChecks(todayId());
   renderDate();
   renderTasks();
+}
+
+function csvCell(value) {
+  const text = String(value);
+  // Keep user-entered formulas as plain text when a spreadsheet opens the file.
+  const safe = /^\s*[=+@＝＋－＠-]/u.test(text) || /^[\t\r\n]/.test(text) ? "'" + text : text;
+  return '"' + safe.replaceAll('"', '""') + '"';
+}
+
+function exportTasks() {
+  if (!tasks.length) return;
+  const rows = [
+    ["序号", "任务", "时间", "完成", markTitle],
+    ...tasks.map((task, index) => [
+      index + 1, task.text, task.time, doneMap[task.id] ? "是" : "否", markedMap[task.id] ? "是" : "否",
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const file = new Blob(["\uFEFF", csv, "\r\n"], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(file);
+  link.download = `每日任务-${todayId()}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Give Safari time to read the file before releasing its URL.
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
 }
 
 function updateMarkTitle() {
@@ -422,6 +485,7 @@ markTitleForm.addEventListener("submit", (event) => {
 cancelMarkTitleButton.addEventListener("click", () => markTitleDialog.close());
 refreshDayButton.addEventListener("click", refreshDay);
 clearDoneButton.addEventListener("click", refreshDay);
+exportTasksButton?.addEventListener("click", exportTasks);
 
 taskList.addEventListener("pointerdown", beginDrag);
 taskList.addEventListener("pointermove", followDrag);

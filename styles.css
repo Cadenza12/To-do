@@ -187,8 +187,14 @@ button svg,
   margin-bottom: 12px;
 }
 
+.section-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .text-button {
-  min-height: 38px;
+  min-width: 44px;
+  min-height: 44px;
   gap: 7px;
   padding: 0 10px;
   border-radius: 8px;
@@ -196,6 +202,11 @@ button svg,
   color: #40515f;
   font-size: 14px;
   font-weight: 700;
+}
+
+.text-button:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .task-list {
@@ -511,6 +522,10 @@ button svg,
   outline: none;
 }
 
+.composer:focus-within {
+  bottom: calc(14px + max(env(safe-area-inset-bottom, 0px), 100% - var(--visible-bottom, 100%)));
+}
+
 .composer input:focus {
   border-color: var(--accent);
   background: #ffffff;
@@ -530,6 +545,7 @@ button svg,
   height: 1px;
   padding: 0;
   overflow: hidden;
+  overflow-anchor: none;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
@@ -560,7 +576,7 @@ button svg,
     width: 54px;
   }
 
-  .text-button span {
+  #clearDoneButton span {
     display: none;
   }
 }
