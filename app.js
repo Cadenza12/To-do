@@ -431,10 +431,15 @@ function refreshDay() {
   renderTasks();
 }
 
+function needsCsvGuard(text) {
+  const bare = text.replace(/^'+/, "");
+  return /^\s*[=+@＝＋－＠-]/u.test(bare) || /^[\t\r\n]/.test(bare);
+}
+
 function csvCell(value) {
   const text = String(value);
-  // Keep user-entered formulas as plain text when a spreadsheet opens the file.
-  const safe = /^\s*[=+@＝＋－＠-]/u.test(text) || /^[\t\r\n]/.test(text) ? "'" + text : text;
+  // Prefix one apostrophe, including when the user already wrote a literal one.
+  const safe = needsCsvGuard(text) ? "'" + text : text;
   return '"' + safe.replaceAll('"', '""') + '"';
 }
 
@@ -466,6 +471,160 @@ function updateMarkTitle() {
     button.title = markTitle;
   }
 }
+
+async function readTaskCsv(file) {
+  if (file.size > 2 * 1024 * 1024) throw new Error("文件超过 2 MB，请分成较小的 CSV。");
+  const { parse } = await import("./vendor/csv-parse-6.1.0.js");
+  let rows;
+  try {
+    const source = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+    rows = parse(source, { bom: true, skip_empty_lines: true, to: 1002 });
+  } catch {
+    throw new Error("读不出这个 CSV，请选择清单导出的 UTF-8 CSV 文件。");
+  }
+  const [head, ...records] = rows;
+  if (head?.length !== 5 || !["序号", "任务", "时间", "完成"].every((h, i) => head[i].trim() === h)) {
+    throw new Error("列头不匹配，请选择由「导出」生成的五列 CSV。");
+  }
+  const unguard = (s) => s.startsWith("'") && needsCsvGuard(s) ? s.slice(1) : s;
+  const title = unguard(head[4]).trim();
+  if (!title || title.length > 24) throw new Error("第五列的列名需要 1 至 24 个字符。");
+  if (!records.length) throw new Error("文件里没有任务。");
+  if (records.length > 1000) throw new Error("一次最多导入 1000 项，请分批导入。");
+  const items = records.map(([number, text, time, done, marked], i) => {
+    if (!/^\d+$/.test(number.trim()) || !["是", "否"].includes(done.trim()) || !["是", "否"].includes(marked.trim())) {
+      throw new Error(`第 ${i + 1} 项格式不对：序号应为数字，勾选状态应为「是」或「否」。`);
+    }
+    return { text: unguard(text), time: unguard(time), done: done.trim() === "是", marked: marked.trim() === "是" };
+  });
+  return { title, items };
+}
+
+function appendImportedTasks({ title, items }, useTitle) {
+  const nextTasks = loadTasks();
+  const nextDone = loadToggleMap(DONE_KEY);
+  const nextMarked = loadToggleMap(MARKED_KEY);
+  const nextTitle = useTitle ? title : localStorage.getItem(MARK_TITLE_KEY) || DEFAULT_MARK_TITLE;
+  for (const item of items) {
+    const id = makeTaskId();
+    nextTasks.push({ id, text: item.text, time: item.time });
+    if (item.done) nextDone[id] = true;
+    if (item.marked) nextMarked[id] = true;
+  }
+
+  // A full phone can reject a write midway. Restore the earlier keys before returning.
+  const writes = [[DONE_KEY, JSON.stringify(nextDone)], [MARKED_KEY, JSON.stringify(nextMarked)]];
+  if (useTitle) writes.push([MARK_TITLE_KEY, title]);
+  writes.push([STORAGE_KEY, JSON.stringify(nextTasks)]);
+  const applied = [];
+  try {
+    for (const [key, value] of writes) {
+      const previous = localStorage.getItem(key);
+      localStorage.setItem(key, value);
+      applied.push([key, previous]);
+    }
+  } catch (error) {
+    for (const [key, previous] of applied.reverse()) {
+      if (previous === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, previous);
+    }
+    throw error;
+  }
+  tasks = nextTasks;
+  doneMap = nextDone;
+  markedMap = nextMarked;
+  markTitle = nextTitle;
+  renderTasks();
+  updateMarkTitle();
+}
+
+function setupImport() {
+  const button = document.querySelector("#importTasksButton");
+  if (!button) return;
+  const picker = document.querySelector("#importFileInput");
+  const dialog = document.querySelector("#importDialog");
+  const summary = dialog.querySelector("#importSummary");
+  const preview = dialog.querySelector("ol");
+  const choice = dialog.querySelector("#importColumnChoice");
+  const useTitle = dialog.querySelector("#useImportedTitle");
+  const confirm = dialog.querySelector("#confirmImportButton");
+  const cancel = dialog.querySelector("#cancelImportButton");
+  const receipt = document.querySelector("#importReceipt");
+  let receiptTimer;
+  let pending = null;
+  let readId = 0;
+
+  button.addEventListener("click", () => picker.click());
+  cancel.addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    if (dialog.open) return;
+    ++readId;
+    pending = null;
+    preview.replaceChildren();
+    summary.textContent = "";
+    button.focus({ preventScroll: true });
+  });
+  picker.addEventListener("change", async () => {
+    const file = picker.files[0];
+    picker.value = "";
+    if (!file) return;
+    const ticket = ++readId;
+    pending = null;
+    preview.replaceChildren();
+    choice.hidden = true;
+    useTitle.checked = false;
+    confirm.disabled = true;
+    cancel.textContent = "取消";
+    summary.textContent = "正在读取文件…";
+    dialog.showModal();
+    try {
+      const result = await readTaskCsv(file);
+      if (!dialog.open || ticket !== readId) return;
+      const { title, items } = result;
+      const sample = items.slice(0, 20);
+      const names = new Set(tasks.map((task) => task.text));
+      const repeated = items.filter((item) => names.has(item.text)).length;
+      summary.textContent = `将按文件顺序追加 ${items.length} 项，已有任务不会替换。` +
+        (repeated ? `其中 ${repeated} 项与已有任务同名，也会追加。` : "") +
+        (sample.length < items.length ? `下方预览前 ${sample.length} 项。` : "");
+      for (const item of sample) {
+        const li = document.createElement("li");
+        const detail = document.createElement("small");
+        li.textContent = item.text || "（空白任务）";
+        detail.textContent = [item.time, item.done ? "已完成" : "未完成", `${title}：${item.marked ? "是" : "否"}`].filter(Boolean).join(" · ");
+        li.append(detail);
+        preview.append(li);
+      }
+      choice.hidden = title === markTitle;
+      useTitle.checked = !choice.hidden && markTitle === DEFAULT_MARK_TITLE && localStorage.getItem(MARK_TITLE_KEY) === null;
+      dialog.querySelector("#importColumnLabel").textContent = `使用文件列名「${title}」（当前：${markTitle}）`;
+      pending = result;
+      confirm.disabled = false;
+    } catch (error) {
+      if (!dialog.open || ticket !== readId) return;
+      summary.textContent = error instanceof TypeError ? "无法读取文件，请重新打开清单再试。" : error.message;
+      cancel.textContent = "关闭";
+    }
+  });
+  confirm.addEventListener("click", () => {
+    if (!pending || confirm.disabled) return;
+    confirm.disabled = true;
+    try {
+      appendImportedTasks(pending, !choice.hidden && useTitle.checked);
+    } catch {
+      summary.textContent = "保存失败，请检查浏览器的可用存储空间后重试。";
+      confirm.disabled = false;
+      return;
+    }
+    receipt.textContent = `已追加 ${pending.items.length} 项任务`;
+    clearTimeout(receiptTimer);
+    receiptTimer = setTimeout(() => { receipt.textContent = ""; }, 6000);
+    pending = null;
+    dialog.close();
+  });
+}
+
+setupImport();
 
 editMarkTitleButton.addEventListener("click", () => {
   markTitleInput.value = markTitle;

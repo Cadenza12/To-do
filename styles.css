@@ -448,6 +448,72 @@ button svg,
   background: rgba(31, 47, 62, 0.42);
 }
 
+.import-dialog {
+  width: min(calc(100% - 32px), 440px);
+  max-height: 85vh;
+  max-height: 85dvh;
+  overflow: auto;
+}
+
+.import-dialog p,
+.import-dialog ol {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.import-dialog ol {
+  padding: 0 4px 0 28px;
+  max-height: 36vh;
+  overflow: auto;
+}
+
+.import-dialog ol:empty,
+.import-dialog [hidden] {
+  display: none;
+}
+
+.import-dialog li {
+  padding: 6px 0;
+  white-space: pre-wrap;
+}
+
+.import-dialog li small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-soft);
+}
+
+#importColumnChoice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+}
+
+#importColumnChoice[hidden] { display: none; }
+
+#useImportedTitle {
+  flex: 0 0 20px;
+  width: 20px;
+  min-height: 0;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.import-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#importReceipt:not(:empty) {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 15px;
+}
+
 .rename-dialog input {
   width: 100%;
   min-height: 44px;

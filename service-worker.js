@@ -1,9 +1,10 @@
 const CACHE_PREFIX = `daily-tasks:${self.registration.scope}:`;
-const CACHE_NAME = `${CACHE_PREFIX}v9`;
+const CACHE_NAME = `${CACHE_PREFIX}v10`;
 const ASSETS = [
   "./",
-  "./styles.css?v=9",
-  "./app.js?v=9",
+  "./styles.css?v=10",
+  "./app.js?v=10",
+  "./vendor/csv-parse-6.1.0.js",
   "./manifest.json",
   "./icon.svg",
 ];
