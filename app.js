@@ -338,14 +338,21 @@ function appendTaskRow(task) {
     saveTasks();
   });
 
-  deleteButton.addEventListener("click", () => {
+  deleteButton.addEventListener("click", (event) => {
+    endDrag(false);
+    const keepFocus = event.detail === 0 && document.activeElement === deleteButton;
+    const neighbor = node.nextElementSibling ?? node.previousElementSibling;
     tasks = tasks.filter((item) => item.id !== task.id);
     delete doneMap[task.id];
     delete markedMap[task.id];
     saveTasks();
     localStorage.setItem(DONE_KEY, JSON.stringify(doneMap));
     localStorage.setItem(MARKED_KEY, JSON.stringify(markedMap));
-    renderTasks();
+    node.remove();
+    renderSummary();
+    if (keepFocus) {
+      (neighbor?.querySelector(".delete-button") ?? addButton).focus({ preventScroll: true });
+    }
   });
 
   taskList.append(node);
